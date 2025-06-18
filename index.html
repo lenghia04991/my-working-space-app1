@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Working Space</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="style.css"> <!-- Link to your CSS file -->
+
+    <!-- Firebase SDK - ALWAYS load these scripts first for Firebase to work -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // IMPORTANT: These global variables are provided by the Canvas environment.
+        // For local testing, you might need to hardcode them or load them differently.
+        // DO NOT change the structure of these lines.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // 'default-app-id' for local testing if __app_id is not set
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyCS8wBGoMeHyhBX6KbPMnqEDn_hcF1K0XI",
+            authDomain: "myworkingspaceapp.firebaseapp.com",
+            projectId: "myworkingspaceapp",
+            storageBucket: "myworkingspaceapp.firebasestorage.app",
+            messagingSenderId: "155306453706",
+            appId: "1:155306453706:web:5b2d83ef45e3a122046233",
+            measurementId: "G-4CNT4PB3XS"
+        };
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Make Firebase instances globally accessible in script.js scope (via window object)
+        window.firebaseApp = initializeApp(firebaseConfig);
+        window.firebaseAuth = getAuth(window.firebaseApp);
+        window.firebaseDb = getFirestore(window.firebaseApp);
+        window.appGlobalId = appId;
+        window.initialAuthToken = initialAuthToken;
+
+        // Listen for auth state changes and then load tasks
+        onAuthStateChanged(window.firebaseAuth, async (user) => {
+            if (user) {
+                // User is signed in.
+                window.currentUserUid = user.uid;
+                document.getElementById('user-id-display').textContent = user.uid;
+                // Once authenticated, proceed to load tasks and set up listeners
+                // This call is now handled directly by script.js after auth is ready
+            } else {
+                // User is signed out. Try anonymous sign-in if no token provided.
+                if (!window.initialAuthToken) {
+                    try {
+                        await signInAnonymously(window.firebaseAuth);
+                        console.log("Signed in anonymously.");
+                    } catch (error) {
+                        console.error("Error signing in anonymously:", error);
+                        document.getElementById('user-id-display').textContent = 'Lỗi đăng nhập';
+                    }
+                }
+            }
+        });
+
+        // Use custom token if provided (Canvas environment)
+        if (window.initialAuthToken) {
+            signInWithCustomToken(window.firebaseAuth, window.initialAuthToken)
+                .then((userCredential) => {
+                    console.log("Signed in with custom token:", userCredential.user.uid);
+                })
+                .catch((error) => {
+                    console.error("Error signing in with custom token:", error);
+                    // Fallback to anonymous sign-in if custom token fails (or show error)
+                    signInAnonymously(window.firebaseAuth).catch(err => console.error("Fallback anonymous sign-in failed:", err));
+                });
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Working Space</h1>
+
+        <div class="user-info">
+            Xin chào, bạn đang dùng với ID: <span id="user-id-display">Đang tải...</span>
+        </div>
+
+        <section class="category" data-category="marketing">
+            <h2>
+                <span>Marketing</span>
+                <button class="add-task-btn" data-category-id="marketing">Thêm Công Việc Mới</button>
+            </h2>
+            <ul id="marketing-tasks">
+                <!-- Tasks will be loaded here by JavaScript -->
+            </ul>
+            <div class="add-task-form" data-category-id="marketing">
+                <input type="text" placeholder="Tên công việc mới..." class="new-task-name">
+                <input type="datetime-local" class="new-task-deadline" placeholder="Thời gian kết thúc">
+                <select class="new-task-priority">
+                    <option value="normal">Bình thường</option> <!-- Default to normal -->
+                    <option value="important">Quan trọng</option>
+                    <option value="low">Không quan trọng</option>
+                </select>
+                <button class="create-task-btn">Tạo Công Việc</button>
+            </div>
+        </section>
+
+        <section class="category" data-category="gamedev">
+            <h2>
+                <span>GameDev</span>
+                <button class="add-task-btn" data-category-id="gamedev">Thêm Công Việc Mới</button>
+            </h2>
+            <ul id="gamedev-tasks">
+                <!-- Tasks will be loaded here by JavaScript -->
+            </ul>
+            <div class="add-task-form" data-category-id="gamedev">
+                <input type="text" placeholder="Tên công việc mới..." class="new-task-name">
+                <input type="datetime-local" class="new-task-deadline" placeholder="Thời gian kết thúc">
+                <select class="new-task-priority">
+                    <option value="normal">Bình thường</option>
+                    <option value="important">Quan trọng</option>
+                    <option value="low">Không quan trọng</option>
+                </select>
+                <button class="create-task-btn">Tạo Công Việc</button>
+            </div>
+        </section>
+
+        <section class="category" data-category="personal">
+            <h2>
+                <span>Học Tập Cá Nhân</span>
+                <button class="add-task-btn" data-category-id="personal">Thêm Công Việc Mới</button>
+            </h2>
+            <ul id="personal-tasks">
+                <!-- Tasks will be loaded here by JavaScript -->
+            </ul>
+            <div class="add-task-form" data-category-id="personal">
+                <input type="text" placeholder="Tên công việc mới..." class="new-task-name">
+                <input type="datetime-local" class="new-task-deadline" placeholder="Thời gian kết thúc">
+                <select class="new-task-priority">
+                    <option value="normal">Bình thường</option>
+                    <option value="important">Quan trọng</option>
+                    <option value="low">Không quan trọng</option>
+                </select>
+                <button class="create-task-btn">Tạo Công Việc</button>
+            </div>
+        </section>
+
+        <!-- Archive Section -->
+        <section class="category" id="archive-section">
+            <h2>Lưu Trữ (Đã Hoàn Thành)</h2>
+            <ul id="archive-tasks">
+                <!-- Completed tasks will be moved here by JavaScript -->
+            </ul>
+        </section>
+    </div>
+
+    <!-- Custom Message Box -->
+    <div class="custom-message-box" id="message-box"></div>
+
+    <script src="script.js"></script> <!-- Link to your JavaScript file -->
+</body>
+</html>
