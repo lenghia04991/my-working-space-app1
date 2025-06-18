@@ -19,6 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentUserUid; // Current authenticated user's UID
     let appGlobalId; // App ID from Canvas environment
 
+    // Local cache for tasks, populated by Firestore's onSnapshot
+    let tasksCache = {}; 
+
     const PRIORITY_ORDER = {
         'important': 1,
         'normal': 2,
@@ -26,28 +29,23 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Wait for Firebase to be initialized and user authenticated
-    if (window.firebaseApp && window.firebaseAuth && window.firebaseDb && window.appGlobalId) {
-        db = window.firebaseDb;
-        auth = window.firebaseAuth;
-        appGlobalId = window.appGlobalId;
+    // Use a short delay if window.firebaseApp etc. are not immediately available
+    const initFirebaseInterval = setInterval(() => {
+        // Ensure all required window properties are available and user UID is set
+        if (window.firebaseApp && window.firebaseAuth && window.firebaseDb && window.appGlobalId && window.currentUserUid) {
+            clearInterval(initFirebaseInterval); // Stop trying once initialized
+            db = window.firebaseDb;
+            auth = window.firebaseAuth;
+            appGlobalId = window.appGlobalId;
+            currentUserUid = window.currentUserUid; // Get UID from window after auth in index.html
 
-        // Listen for auth state changes from the script in index.html
-        // This ensures currentUserUid is set before Firestore operations.
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                currentUserUid = user.uid;
-                // Once authenticated, load tasks via Firestore listener
-                setupFirestoreListeners();
-            } else {
-                console.log("No user signed in. Waiting for auth in index.html.");
-                // If onAuthStateChanged fires and user is null, it means sign-in failed or not yet completed.
-                // The index.html script handles initial sign-in.
-            }
-        });
-    } else {
-        console.error("Firebase not initialized. Check index.html script.");
-        showMessage("Lỗi: Không thể kết nối Firebase. Vui lòng kiểm tra console.", "error");
-    }
+            // Now that Firebase is ready and user is authenticated, set up Firestore listener
+            setupFirestoreListeners();
+        } else {
+            // console.log("Waiting for Firebase initialization and user authentication...");
+            // Display loading state or message if needed
+        }
+    }, 100); // Check every 100ms
 
     // --- Utility Functions ---
     /**
@@ -177,11 +175,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            // Clear the cache before populating with new data from snapshot
+            tasksCache = {}; 
             const allTasksData = [];
+
             snapshot.forEach(doc => {
                 const taskData = doc.data();
                 // Ensure the task has an ID that matches the document ID
                 taskData.id = doc.id; 
+                tasksCache[doc.id] = taskData; // Populate the cache
                 allTasksData.push(taskData);
             });
 
@@ -227,6 +229,16 @@ document.addEventListener('DOMContentLoaded', () => {
             showMessage("Lỗi tải công việc từ đám mây. Vui lòng kiểm tra kết nối.", "error");
         });
     }
+
+    /**
+     * Retrieves a task's data from the local tasksCache by its ID.
+     * @param {string} taskId - The ID of the task to retrieve.
+     * @returns {object|null} The task object from cache or null if not found.
+     */
+    function getTaskData(taskId) {
+        return tasksCache[taskId] || null;
+    }
+
 
     /**
      * Saves or updates a task's data in Firestore.
@@ -335,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const now = new Date().getTime();
         
         // Retrieve the saved start time from task data for total duration calculation
-        const taskData = getTaskData(taskElement.dataset.taskId);
+        const taskData = getTaskData(taskElement.dataset.taskId); // Get from local cache (DOM's data-set)
         // If start time is not set, default it to the current time for calculation
         const startTime = taskData && taskData.startTime ? new Date(taskData.startTime).getTime() : now; 
 
